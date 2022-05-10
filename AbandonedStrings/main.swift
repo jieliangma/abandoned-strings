@@ -65,17 +65,23 @@ let doubleQuote = "\""
 func extractStringIdentifiersFrom(_ stringsFile: String) -> [String] {
     return contentsOfFile(stringsFile)
         .components(separatedBy: "\n")
-        .map    { $0.trimmingCharacters(in: CharacterSet.whitespaces) }
-        .filter { $0.hasPrefix(doubleQuote) }
-        .map    { extractStringIdentifierFromTrimmedLine($0) }
+        .compactMap { extractStringIdentifierFromTrimmedLine($0) }
 }
 
-func extractStringIdentifierFromTrimmedLine(_ line: String) -> String {
-    let indexAfterFirstQuote = line.index(after: line.startIndex)
-    let lineWithoutFirstQuote = line[indexAfterFirstQuote...]
-    let endIndex = lineWithoutFirstQuote.firstIndex(of:"\"")!
-    let identifier = lineWithoutFirstQuote[..<endIndex]
-    return String(identifier)
+func extractStringIdentifierFromTrimmedLine(_ line: String) -> String? {
+    let components = line.components(separatedBy: "=")
+    guard components.count == 2,
+          let key = components.first?.trimmingCharacters(in: CharacterSet.whitespaces), !key.isEmpty else {
+        return nil
+    }
+    
+    if let indexAfterFirstQuote = key.firstIndex(of:"\""),
+       let endIndex = key[indexAfterFirstQuote...].firstIndex(of:"\"") {
+        let lineWithoutFirstQuote = key[indexAfterFirstQuote...]
+        let identifier = lineWithoutFirstQuote[..<endIndex]
+        return String(identifier)
+    }
+    return key
 }
 
 // MARK: - Abandoned identifier detection
@@ -95,8 +101,8 @@ func stringsFile(_ stringsFile: String, without identifiers: [String]) -> String
     return contentsOfFile(stringsFile)
         .components(separatedBy: "\n")
         .filter({ (line) in
-            guard line.hasPrefix(doubleQuote) else { return true } // leave non-strings lines like comments in
-            let lineIdentifier = extractStringIdentifierFromTrimmedLine(line.trimmingCharacters(in: CharacterSet.whitespaces))
+            guard let lineIdentifier = extractStringIdentifierFromTrimmedLine(line.trimmingCharacters(in: CharacterSet.whitespaces)) else { return true } // leave non-strings lines like comments in
+            
             return identifiers.contains(lineIdentifier) == false
         })
         .joined(separator: "\n")
